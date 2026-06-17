@@ -3,6 +3,31 @@
 
 #include <stdint.h>
 
+// ---------------------------------------------------------------------------
+// UAV TELEMETRY STATUS AND ERROR FLAGS (16-BIT BITMASKING)
+// ---------------------------------------------------------------------------
+#define STATUS_OK              0      // 0000 0000 0000 0000 -> All systems are operating normally.
+
+// --- POWER & THERMAL ALARMS ---
+#define ERR_BATT_LOW           1      // 0000 0000 0000 0001 -> Battery capacity is below 20%.
+#define ERR_BATT_CRIT          2      // 0000 0000 0000 0010 -> Battery capacity is critically low (< 5%). Emergency landing required.
+#define ERR_MOTOR_HOT          4      // 0000 0000 0000 0100 -> Motor temperature exceeds safe operating limits (> 80°C).
+#define ERR_MOTOR_CRIT         8      // 0000 0000 0000 1000 -> Motor temperature is critical (> 90°C). Risk of fire/failure.
+#define ERR_BATT_COLD          16     // 0000 0000 0001 0000 -> Battery temperature is critically low (< 0°C). Risk of voltage drop.
+#define ERR_BATT_HOT           32     // 0000 0000 0010 0000 -> Battery temperature is critically high (> 60°C). Risk of thermal runaway.
+
+// --- FLIGHT DYNAMICS ALARMS ---
+#define ERR_AERODYNAMICS       64     // 0000 0000 0100 0000 -> Loss of aerodynamic stability (Pitch/Roll angle > 60°).
+#define ERR_ALTITUDE_MAX       128    // 0000 0000 1000 0000 -> Maximum legal flight altitude exceeded.
+#define ERR_TERRAIN_WARN       256    // 0000 0001 0000 0000 -> Ground proximity warning (Altitude < 5m). Crash risk.
+
+// --- ANOMALY & SECURITY ALARMS ---
+#define ERR_FREEFALL           512    // 0000 0010 0000 0000 -> Abnormal altitude drop detected (Freefall anomaly).
+#define ERR_GPS_SPOOFING       1024   // 0000 0100 0000 0000 -> Sudden illogical location jump detected (Possible GPS Spoofing).
+
+// NOTE: Bits 2048 to 32768 are reserved for future expansions.
+// ---------------------------------------------------------------------------
+
 /**
  * @brief Optimized data structure for holding drone telemetry and sensor data.
  * * Elements are sorted from the largest memory alignment requirement (4 bytes) 
@@ -32,5 +57,7 @@ typedef struct {
      * No internal padding is generated between the fields.
      */
 } DroneData;
+
+
 
 #endif // SENSORS_DATA_H
