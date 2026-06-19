@@ -121,6 +121,7 @@ static bool read_and_parse_line(DroneData *drone_ptr)
     char *endptr;
     unsigned long ul_tmp;
     long           l_tmp;
+    float          f_tmp;
 
     // --- drone_id (uint16_t) ---
     PARSE_ULONG(ul_tmp, p, endptr, ',');
@@ -157,35 +158,32 @@ static bool read_and_parse_line(DroneData *drone_ptr)
     RANGE_CHECK(tmp.yaw, YAW_MIN, YAW_MAX);
 
     // --- motor_temp (int16_t) ---
-    PARSE_LONG(l_tmp, p, endptr, ',');
-    if (l_tmp < INT16_MIN || l_tmp > INT16_MAX) goto error_cleanup;
-    RANGE_CHECK((int)l_tmp, MOTOR_TEMP_MIN, MOTOR_TEMP_MAX);
-    tmp.motor_temp = (int16_t)l_tmp;
+    PARSE_FLOAT(f_tmp, p, endptr, ',');
+    RANGE_CHECK(f_tmp, MOTOR_TEMP_MIN, MOTOR_TEMP_MAX);
+    tmp.motor_temp = (int16_t)f_tmp;
 
     // --- battery_temp (int16_t) ---
-    PARSE_LONG(l_tmp, p, endptr, ',');
-    if (l_tmp < INT16_MIN || l_tmp > INT16_MAX) goto error_cleanup;
-    RANGE_CHECK((int)l_tmp, BATTERY_TEMP_MIN, BATTERY_TEMP_MAX);
-    tmp.battery_temp = (int16_t)l_tmp;
+    PARSE_FLOAT(f_tmp, p, endptr, ',');
+    RANGE_CHECK(f_tmp, BATTERY_TEMP_MIN, BATTERY_TEMP_MAX);
+    tmp.battery_temp = (int16_t)f_tmp;
 
-    // --- battery_percent (uint8_t) — final field, ends with \n / \r / \0 ---
+    // --- battery_percent (uint8_t) — last side, \n / \r / \0 finish ---
     if (*p == '-') goto error_cleanup;
     errno = 0;
-    ul_tmp = strtoul(p, &endptr, 10);
+    f_tmp = strtof(p, &endptr);
     if (p == endptr || errno == ERANGE
         || (*endptr != '\n' && *endptr != '\r' && *endptr != '\0')) {
         goto error_cleanup;
     }
-    if (ul_tmp > BATTERY_PCT_MAX) goto error_cleanup;
-    tmp.battery_percent = (uint8_t)ul_tmp;
+    if (f_tmp > BATTERY_PCT_MAX) goto error_cleanup;
+    tmp.battery_percent = (uint8_t)f_tmp;
 
     // Atomic update — the main struct is written only if execution reaches here.
     *drone_ptr = tmp;
     return true;
 
-error_cleanup:
-    // Simply reject the malformed line and return false to allow the system to continue reading
-    return false;
+    error_cleanup:
+      return false;
 }
 
 // ---------------------------------------------------------------------------
