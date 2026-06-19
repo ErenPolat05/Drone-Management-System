@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <errno.h>     
-#include <math.h>   
+#include <errno.h>     // For errno checking
+#include <math.h>      // For isnan() / isinf()
+#include <locale.h>    
 
 // Module-specific file pointer, isolated from the outside world
 static FILE *flight_data_file = NULL;
@@ -37,10 +38,11 @@ static FILE *flight_data_file = NULL;
 
 /**
  * @brief Validates overflow and endptr after strtoul.
- * Executes goto error_cleanup on failure.
+ * Executes goto error_cleanup on failure or if a negative value is detected.
  */
 #define PARSE_ULONG(dst, p, endptr, expected_next)          \
     do {                                                     \
+        if (*(p) == '-') goto error_cleanup;                 \
         errno = 0;                                           \
         (dst) = strtoul((p), &(endptr), 10);                 \
         if ((p) == (endptr) || errno == ERANGE               \
@@ -88,13 +90,11 @@ static FILE *flight_data_file = NULL;
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Safely reads a single CSV line and parses it into a TEMPORARY struct;
- * performs an atomic copy to the main drone_ptr only if all steps succeed.
- *
- * @param drone_ptr  Target DroneData pointer.
- * @return true  -> success, false -> EOF or any error.
+ * @brief Safely reads a single CSV line and parses it into a TEMPORARY struct.
+ * * Corrupted lines are skipped without closing the file to ensure system uptime.
+ * * @param drone_ptr  Target DroneData pointer.
+ * @return true  -> success, false -> EOF or malformed line.
  */
-
 static bool read_and_parse_line(DroneData *drone_ptr)
 {
     // Verify that the file pointer is valid upon entering the function.
@@ -102,7 +102,7 @@ static bool read_and_parse_line(DroneData *drone_ptr)
         return false;
     }
 
-    char line_buffer[128];
+    char line_buffer[256];
 
     // 1. Safe line reading
     if (fgets(line_buffer, sizeof(line_buffer), flight_data_file) == NULL) {
@@ -114,16 +114,15 @@ static bool read_and_parse_line(DroneData *drone_ptr)
         goto error_cleanup;
     }
 
-    //Temporary struct — data is not written to main memory until all fields are verified.
+    // Temporary struct — data is not written to main memory until all fields are verified.
     DroneData tmp = {0};
 
     char *p = line_buffer;
     char *endptr;
     unsigned long ul_tmp;
-    long l_tmp;
+    long           l_tmp;
 
     // --- drone_id (uint16_t) ---
-    // errno is reset, ERANGE is caught after overflow.
     PARSE_ULONG(ul_tmp, p, endptr, ',');
     if (ul_tmp > UINT16_MAX) goto error_cleanup;
     tmp.drone_id = (uint16_t)ul_tmp;
@@ -134,7 +133,6 @@ static bool read_and_parse_line(DroneData *drone_ptr)
     tmp.timestamp = (uint32_t)ul_tmp;
 
     // --- latitude (float) ---
-    // FIX #3: isnan / isinf; FIX #4: physical range
     PARSE_FLOAT(tmp.latitude, p, endptr, ',');
     RANGE_CHECK(tmp.latitude, LATITUDE_MIN, LATITUDE_MAX);
 
@@ -171,7 +169,7 @@ static bool read_and_parse_line(DroneData *drone_ptr)
     tmp.battery_temp = (int16_t)l_tmp;
 
     // --- battery_percent (uint8_t) — final field, ends with \n / \r / \0 ---
-    // Manual parsing is used instead of the macro because the final field does not end with a comma.
+    if (*p == '-') goto error_cleanup;
     errno = 0;
     ul_tmp = strtoul(p, &endptr, 10);
     if (p == endptr || errno == ERANGE
@@ -181,89 +179,96 @@ static bool read_and_parse_line(DroneData *drone_ptr)
     if (ul_tmp > BATTERY_PCT_MAX) goto error_cleanup;
     tmp.battery_percent = (uint8_t)ul_tmp;
 
-    // FIX #5: Atomic update — the main struct is written only if execution reaches here.
+    // Atomic update — the main struct is written only if execution reaches here.
     *drone_ptr = tmp;
     return true;
 
 error_cleanup:
-    if (flight_data_file != NULL) {
-        fclose(flight_data_file);
-        flight_data_file = NULL; // Use-After-Free protection
-    }
+    // Simply reject the malformed line and return false to allow the system to continue reading
     return false;
 }
+
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Comprehensive telemetry diagnostic suite for real-time UAV monitoring.
- * * This section contains static helper functions responsible for the health, 
- * safety, and security of the drone. The diagnostic checks are divided into three parts:
- * 1. Power & Thermal: Monitors battery charge levels and hardware temperatures.
- * 2. Flight Dynamics: Ensures aerodynamic stability and compliance with legal altitude limits.
- * 3. Security & Anomalies: Detects physical failures (freefall) and cyber threats 
- * (GPS spoofing) using time-based kinematic calculations.
- * * All functions utilize Bitwise OR (|=) operations to safely stack exclusive 
- * error flags into the drone's status_code without overwriting each other.
+ * @brief Inspects battery levels and temperatures, setting exclusive bitmask error flags.
+ * * Uses 'else if' structures to ensure that if a critical threshold is breached,
+ * * the lower-tier warning flag is not redundantly set.
+ * * @param drone_ptr Pointer to the current telemetry data struct.
  */
-
 static void check_battery_and_temp(DroneData *drone_ptr)
 {
-   // Battery checks: If critical, do NOT set the low warning.
-   if(drone_ptr->battery_percent < 5){
-    drone_ptr->status_code |= ERR_BATT_CRIT;
-   }else if(drone_ptr->battery_percent < 20){
-    drone_ptr->status_code |= ERR_BATT_LOW;
-   }
+    // Battery checks: If critical, do NOT set the low warning.
+    if (drone_ptr->battery_percent < 5) {
+        drone_ptr->status_code |= ERR_BATT_CRIT;
+    } else if (drone_ptr->battery_percent < 20) {
+        drone_ptr->status_code |= ERR_BATT_LOW;
+    }
 
-   // Motor temp checks: If critical, do NOT set the hot warning.
-   if(drone_ptr->motor_temp > 90){
-    drone_ptr->status_code |= ERR_MOTOR_CRIT;
-   }else if(drone_ptr->motor_temp > 80){
-    drone_ptr->status_code |= ERR_MOTOR_HOT;
-   }
+    // Motor temp checks: If critical, do NOT set the hot warning.
+    if (drone_ptr->motor_temp > 90) {
+        drone_ptr->status_code |= ERR_MOTOR_CRIT;
+    } else if (drone_ptr->motor_temp > 80) {
+        drone_ptr->status_code |= ERR_MOTOR_HOT;
+    }
 
-   // Battery temp check: Covers both freezing and overheating (Li-Po safety limits)
-   if(drone_ptr->battery_temp < 0){
-    drone_ptr->status_code |= ERR_BATT_COLD;
-   }else if(drone_ptr->battery_temp >60){
-    drone_ptr->status_code |= ERR_BATT_HOT;
-   }
+    // Battery temp check: Covers both freezing and overheating (Li-Po safety limits)
+    if (drone_ptr->battery_temp < 0) {
+        drone_ptr->status_code |= ERR_BATT_COLD;
+    } else if (drone_ptr->battery_temp > 60) {
+        drone_ptr->status_code |= ERR_BATT_HOT;
+    }
 }
 
+/**
+ * @brief Monitors flight dynamics and legal altitude limits, setting appropriate bitmask error flags.
+ * * Checks for aerodynamic instability (extreme pitch/roll) and legal altitude ceiling breaches.
+ * * @param drone_ptr Pointer to the current telemetry data struct.
+ */
 static void check_flight_dynamics(DroneData *drone_ptr)
 {
-  // Aerodynamics check: Loss of balance if pitch or roll exceeds 60 degrees in any direction
-  if(drone_ptr->pitch > 60.0f || drone_ptr->pitch < -60.0f ||
-     drone_ptr->roll  > 60.0f || drone_ptr->roll  < -60.0f){
+    // Aerodynamics check: Loss of balance if pitch or roll exceeds 60 degrees in any direction
+    if (drone_ptr->pitch > 60.0f || drone_ptr->pitch < -60.0f ||
+        drone_ptr->roll > 60.0f || drone_ptr->roll < -60.0f) {
         drone_ptr->status_code |= ERR_AERODYNAMICS;
-     }
+    }
 
-
-  // Altitude check: Breaching the legal flight ceiling of 120 meters
-  if(drone_ptr->altitude > 120.0f){
-    drone_ptr->status_code |= ERR_ALTITUDE_MAX;
-  }else if(drone_ptr->altitude <  5.0f){
-    drone_ptr->status_code |= ERR_TERRAIN_WARN;
-  }
+    // Altitude check: Breaching the legal flight ceiling of 120 meters
+    if (drone_ptr->altitude > 120.0f) {
+        drone_ptr->status_code |= ERR_ALTITUDE_MAX;
+    } else if (drone_ptr->altitude < 5.0f) {
+        drone_ptr->status_code |= ERR_TERRAIN_WARN;
+    }
 }
 
+/**
+ * @brief Detects sudden anomalies such as freefall and GPS spoofing attacks using kinematic physics.
+ * * Calculates real-time velocity (Delta Distance / Delta Time) to identify impossible physical movements.
+ * * @param current_data Pointer to the current telemetry data struct.
+ */
 static void check_anomaly_and_spoofing(DroneData *current_data)
 {
     static DroneData prev_data;
     static bool is_first_run = true;
-
+    
     // If this is the first execution, initialize the memory and exit
-    if(is_first_run){
+    if (is_first_run) {
         prev_data = *current_data;
         is_first_run = false;
+        return;
+    }
+
+    // Protection against backward time or duplicate packets (wraparound prevention)
+    if (current_data->timestamp <= prev_data.timestamp) {
+        prev_data = *current_data;
         return;
     }
 
     // Calculate Delta T in seconds (assuming timestamp is in milliseconds)
     float delta_t = (float)(current_data->timestamp - prev_data.timestamp) / 1000.0f;
 
-    // Prevent Division by Zero just in case the timestamp hasn't updated then return the operation.
-    if(delta_t <= 0.0f){
+    // Prevent Division by Zero just in case the timestamp hasn't updated
+    if (delta_t <= 0.0f) {
         return;
     }
 
@@ -274,29 +279,28 @@ static void check_anomaly_and_spoofing(DroneData *current_data)
     float drop_velocity = (prev_data.altitude - current_data->altitude) / delta_t;
 
     // If the drone is falling faster than 20 m/s (approx. 72 km/h), it's in freefall
-    if(drop_velocity > 20.0f){
+    if (drop_velocity > 20.0f) {
         current_data->status_code |= ERR_FREEFALL;
     }
 
     // -----------------------------------------------------------------------
-    // 2. GPS Spoofing Check (Angular Velocity)
-    // Formula: v = |x2 - x1| / dt
+    // 2. GPS Spoofing Check (Vector Velocity)
     // -----------------------------------------------------------------------
     float lat_diff = prev_data.latitude - current_data->latitude;
     float lon_diff = prev_data.longitude - current_data->longitude;
-    
-    // Manual absolute value to save CPU cycles (no math.h dependencies like fabs)
-    if (lat_diff < 0.0f) lat_diff = -lat_diff;
-    if (lon_diff < 0.0f) lon_diff = -lon_diff;
-    
-    // Manual absolute value to save CPU cycles (no math.h dependencies like fabs)
-    float lat_speed = lat_diff / delta_t;
-    float lon_speed = lon_diff / delta_t;
 
-    // Tolerance: Max physical speed in degrees per second.
-    // 0.0005 deg/sec is approximately 55 m/s (200 km/h). 
-    // Anything faster means the drone teleported (Spoofing Attack).
-    if(lat_speed > 0.0005f || lon_speed > 0.0005f){
+    // Longitude wraparound correction (preventing false alarms across the 180th meridian)
+    if (lon_diff > 180.0f) {
+        lon_diff -= 360.0f;
+    } else if (lon_diff < -180.0f) {
+        lon_diff += 360.0f;
+    }
+
+    // Vector total speed calculation using the Pythagorean theorem
+    float total_speed = sqrtf((lat_diff * lat_diff) + (lon_diff * lon_diff)) / delta_t;
+
+    // Tolerance check for diagonal GPS jumps
+    if (total_speed > 0.0007f) {
         current_data->status_code |= ERR_GPS_SPOOFING;
     }
 
@@ -308,12 +312,15 @@ static void check_anomaly_and_spoofing(DroneData *current_data)
 
 bool sensors_init(void)
 {
+    setlocale(LC_NUMERIC, "C"); // Force standard dot decimal separator, regardless of OS language
+
     flight_data_file = fopen("flight_data.csv", "r");
     if (flight_data_file == NULL) {
+        printf("Error: Could not open flight_data.csv for reading.\n");
         return false;
     }
 
-    char header_buffer[128];
+    char header_buffer[256]; // Increased to match new buffer size standard
     if (fgets(header_buffer, sizeof(header_buffer), flight_data_file) == NULL) {
         fclose(flight_data_file);
         flight_data_file = NULL;
@@ -341,17 +348,27 @@ bool sensors_update(DroneData *drone_ptr)
         return false;
     }
 
-    // Read and parse the next line of telemetry data
-    if (!read_and_parse_line(drone_ptr)) {
-        return false;
-    }
-    
-    // Reset status code to STATUS_OK (0) to clear previous cycles' flags
-    drone_ptr->status_code = STATUS_OK;
+    // Skip invalid or corrupted lines until a valid line is successfully parsed or EOF is reached
+    while (!read_and_parse_line(drone_ptr)) {
 
-    // Run the health monitor diagnostics to set appropriate exclusive error flags
+        // 1. Natural End of File check
+        if (feof(flight_data_file)) {
+            return false; // True End of File reached, terminate stream
+        }
+
+        // 2. Hardware / I/O Error check (Cable snap, SD card failure)
+        if (ferror(flight_data_file)) {
+            // Fatal hardware error detected. Break the infinite loop!
+            return false; 
+        }
+    }
+
+    // Reset status code to STATUS_OK (0) to clear previous cycles' flags
+    drone_ptr->status_code = 0;
+
+    // Run the health monitor diagnostics
     check_battery_and_temp(drone_ptr);
-     
+
     // Run the flight dynamics and legal limits diagnostics
     check_flight_dynamics(drone_ptr);
 
@@ -359,4 +376,22 @@ bool sensors_update(DroneData *drone_ptr)
     check_anomaly_and_spoofing(drone_ptr);
 
     return true;
+}
+
+
+/**
+ * @brief Closes the open file stream and safely releases memory resources.
+ * Prevents File Descriptor leaks when the simulation ends.
+ * * @return true if the hardware stream was successfully closed, false if it was already closed or failed.
+ */
+bool sensors_cleanup(void)
+{
+    // Short-Circuit yardımıyla tek satırda hem NULL kontrolü hem güvenli kapatma!
+    if (flight_data_file != NULL && fclose(flight_data_file) == 0) {
+        flight_data_file = NULL; // Dangling pointer koruması
+        return true;
+    }
+    
+    flight_data_file = NULL; // Clean just in case.
+    return false;
 }

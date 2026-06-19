@@ -17,4 +17,10 @@ bool sensors_init(void);
  */
 bool sensors_update(DroneData *drone_ptr);
 
+/**
+ * @brief Close the sensors.
+ * * @return true if initialization is successful, false otherwise.
+ */
+bool sensors_cleanup(void);
+
 #endif
