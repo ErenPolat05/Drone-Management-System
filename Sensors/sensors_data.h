@@ -52,10 +52,9 @@ typedef struct {
     /* 1-Byte Aligned Fields (8-bit Integers) */
     uint8_t battery_percent;    // Battery charge percentage (0 - 100)
     
-    /* * Note: The compiler will automatically add 3 bytes of trailing padding at the end 
-     * to align the total struct size to a multiple of 4 (Total size: 40 bytes). 
-     * No internal padding is generated between the fields.
-     */
+    /* Explicit trailing padding */
+    uint8_t reserved[3];
+    
 } DroneData;
 
 
