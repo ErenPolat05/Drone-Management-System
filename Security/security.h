@@ -8,6 +8,7 @@
 
 #define NONCE_SIZE 12
 #define MAC_SIZE 16
+#define DRONE_DATA_SIZE 40
 
 /**
  * @brief Dynamic calculation of TX buffer size to prevent offset vulnerabilities.
