@@ -54,8 +54,13 @@ typedef struct {
     
     /* Explicit trailing padding */
     uint8_t reserved[3];
-    
+
 } DroneData;
+
+
+// to make this structor 40 byte
+_Static_assert(sizeof(DroneData) == 40,
+               "Unexpected DroneData size");
 
 
 
