@@ -26,16 +26,15 @@ typedef enum {
  */
 
 #pragma pack(push,1)
-typedef struct {
+typedef struct  {
     uint16_t magic;         // Validation identifier (0xABCD)
     uint8_t  version;       // Protocol version
     uint8_t  packet_type;   // Enum identifier for payload processing
     uint32_t session_id;    // Unique timestamp generated at init to track reboots
     uint32_t sequence_id;   // Incrementing counter for packet loss detection
     uint16_t payload_len;   // Exact length of the appended data payload
-}TelemetryHeader;
+} TelemetryHeader;
 #pragma pack(pop)
-
 
 // Compile-time layout verification
 _Static_assert(sizeof(TelemetryHeader) == 14, "TelemetryHeader layout changed");
@@ -46,11 +45,10 @@ _Static_assert(sizeof(TelemetryHeader) == 14, "TelemetryHeader layout changed");
  * @param ip Target IPv4 address as a literal string (e.g., "192.168.1.100").
  * @param port Target UDP port.
  * @return true on success, false if socket creation or IP parsing fails.
- * 
+ *
  * Windows:
  * Caller must initialize Winsock with WSAStartup()
  * before calling udp_link_init().
- *
  */
 bool udp_link_init(const char *ip, uint16_t port);
 
@@ -65,6 +63,7 @@ bool udp_link_send(PacketType type, const uint8_t *payload, size_t payload_len);
 
 /**
  * @brief Closes the socket and releases network resources safely.
+ *
  * Windows:
  * Caller is responsible for calling WSACleanup()
  * after the application no longer needs Winsock.
