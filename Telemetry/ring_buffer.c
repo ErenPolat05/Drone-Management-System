@@ -79,7 +79,7 @@ bool ring_buffer_pop(uint8_t *out_data, size_t max_out_length, size_t *out_lengt
 
     // Prevent Stack Smashing / Blind Copy Buffer Overflows on the caller side
     if (buffer[tail].length > max_out_length) {
-        // Head-of-Line Blocking'i önlemek için paketi çöpe at (Drop the packet)
+        // To prevent head-of-line blocking, drop the packet.
         tail = (tail + 1) % RING_BUFFER_CAPACITY;
         count--;
         // TODO: EXIT CRITICAL SECTION (Enable Interrupts / Unlock Mutex)

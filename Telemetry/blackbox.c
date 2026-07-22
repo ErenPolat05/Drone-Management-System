@@ -1,4 +1,3 @@
-// blackbox.c
 #include "blackbox.h"
 #include <stdio.h>
 #include <string.h>
@@ -79,7 +78,7 @@ static bool _blackbox_flush_unlocked(void)
 
     // Hardware Synchronization: Force the kernel to write data to physical storage
     if (fsync(fileno(log_file)) != 0) {
-    return false;
+        return false;
     }
 
     // Reset the buffer counter only after complete success
