@@ -3,6 +3,14 @@
 #include <string.h>
 #include <unistd.h> // Required for fsync() and POSIX I/O operations
 
+
+#ifdef _WIN32
+#include <io.h>
+#define fsync _commit
+#define fileno _fileno
+#endif
+
+
 // ---------------------------------------------------------------------------
 // Internal Data Structures & Storage
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stddefh>
+#include <stddef.h>
 
 /**
  * @brief Memory limits for the circular buffer queue.
