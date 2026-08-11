@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include "Sensors/sensors_data.h"
+#include "../sensors/sensors_data.h"
 
 #define NONCE_SIZE 12
 #define MAC_SIZE 16

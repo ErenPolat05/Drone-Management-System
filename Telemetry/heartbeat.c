@@ -83,9 +83,6 @@ bool heartbeat_generate(
     out_packet->timestamp = host_to_network_32(current_timestamp);
     out_packet->drone_id  = host_to_network_16(_drone_id);
     out_packet->state     = current_state;
-    
-    // Explicit defensive programming for reserved space
-    out_packet->reserved  = 0U;
 
     return true;
 }

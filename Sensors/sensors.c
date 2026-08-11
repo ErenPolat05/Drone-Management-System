@@ -120,7 +120,6 @@ static bool read_and_parse_line(DroneData *drone_ptr)
     char *p = line_buffer;
     char *endptr;
     unsigned long ul_tmp;
-    long           l_tmp;
     float          f_tmp;
 
     // --- drone_id (uint16_t) ---
