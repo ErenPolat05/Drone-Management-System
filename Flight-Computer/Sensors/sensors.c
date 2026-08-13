@@ -383,9 +383,9 @@ bool sensors_update(DroneData *drone_ptr)
  */
 bool sensors_cleanup(void)
 {
-    // Short-Circuit yardımıyla tek satırda hem NULL kontrolü hem güvenli kapatma!
+    // Both NULL check and safe shutdown in a single line using short-circuiting
     if (flight_data_file != NULL && fclose(flight_data_file) == 0) {
-        flight_data_file = NULL; // Dangling pointer koruması
+        flight_data_file = NULL; // Dangling pointer protection
         return true;
     }
     

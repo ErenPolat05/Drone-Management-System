@@ -20,9 +20,9 @@ class DataProcessor:
             if len(payload) != 8:
                 return None
                 
-            # Unpack heartbeat. Little-endian layout.
+            # Unpack heartbeat. Big-endian layout.
             try:
-                unpacked = struct.unpack('<IHBB', payload)
+                unpacked = struct.unpack('>IHBB', payload)
             except struct.error:
                 return None
                 
@@ -51,7 +51,7 @@ class DataProcessor:
                 self.logger.warning("SECURITY ALERT: Payload authentication failed (InvalidTag). Possible spoofing or corruption.")
                 return None
                 
-            # Unpack telemetry. Little-endian layout.
+            # Unpack telemetry. Big-endian layout.
             # TODO: 32-bit float coordinates have limited GPS precision; migration to 64-bit double requires a C protocol/struct change and larger payload.
             try:
                 unpacked = struct.unpack('<IffffffHhhHB3s', decrypted)
