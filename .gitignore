@@ -9,3 +9,7 @@
 
 # External third-party libraries (mbedTLS should not be pushed)
 third_party/mbedtls/
+
+#pycache files
+__pycache__/
+*.pyc
