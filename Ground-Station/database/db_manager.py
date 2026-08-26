@@ -90,7 +90,7 @@ class DatabaseManager:
 
         # Commit schema changes.
         self.conn.commit()
-
+    
     def insert_telemetry(self, data: dict):
         # Extract values.
         values = (
@@ -123,6 +123,16 @@ class DatabaseManager:
         # Append to buffer. Thread-safe write.
         with self.lock:
             self.heartbeat_buffer.append(values)
+
+    def insert_event(self, severity: str, message: str):
+        # It runs only when there is an error or warning.
+        query = "INSERT INTO EventLogs (Severity, Message) VALUES (?, ?)"
+        try:
+            with self.lock:
+                self.cursor.execute(query, (severity, message))
+                self.conn.commit()
+        except pyodbc.Error as e:
+            logging.error(f"Could not write to the event log.: {e}")
 
     def flush_to_db(self):
         # Copy and clear buffers. Keep lock duration minimal.

@@ -8,22 +8,31 @@ CREATE TABLE Users (
 );
 
 -- Telemetry data. High volume storage.
-CREATE TABLE TelemetryLogs (
-    LogID BIGINT IDENTITY(1,1) PRIMARY KEY, -- Auto-inc PK
-    DroneTimestamp BIGINT NOT NULL, -- Drone internal ms
-    DroneID INT NOT NULL, -- UAV identifier
-    Latitude DECIMAL(10,7) NOT NULL, -- GPS Lat
-    Longitude DECIMAL(10,7) NOT NULL, -- GPS Lon
-    Altitude DECIMAL(10,7) NOT NULL, -- GPS Alt
-    Pitch FLOAT NOT NULL, -- IMU Pitch
-    Roll FLOAT NOT NULL, -- IMU Roll
-    Yaw FLOAT NOT NULL, -- IMU Yaw
-    MotorTemp DECIMAL(5,2) NOT NULL, -- Motor heat
-    BatteryTemp DECIMAL(5,2) NOT NULL, -- Battery heat
-    StatusCode INT NOT NULL, -- Raw state code
-    BatteryPercent INT NOT NULL, -- Power level
-    InsertedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME() -- DB write time
-);
+CREATE TABLE telemetry (
+                    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    timestamp BIGINT NOT NULL,
+                    drone_id INT NOT NULL,
+                    latitude DECIMAL(9,6) NOT NULL,
+                    longitude DECIMAL(9,6) NOT NULL,
+                    altitude REAL NOT NULL,
+                    pitch REAL NOT NULL,
+                    roll REAL NOT NULL,
+                    yaw REAL NOT NULL,
+                    motor_temp DECIMAL(5,2) NOT NULL,
+                    battery_temp DECIMAL(5,2) NOT NULL,
+                    battery_percent INT NOT NULL,
+                    status_code INT NOT NULL,
+                    inserted_at DATETIME2 DEFAULT SYSDATETIME()
+                );
+
+-- Heartbeat data. 1 hz storage
+CREATE TABLE heartbeat (
+                    id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                    timestamp BIGINT NOT NULL,
+                    drone_id INT NOT NULL,
+                    state INT NOT NULL,
+                    inserted_at DATETIME2 DEFAULT SYSDATETIME()
+                );
 
 -- System events. Parsed states.
 CREATE TABLE EventLogs (
