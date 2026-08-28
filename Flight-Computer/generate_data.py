@@ -31,12 +31,12 @@ yaw = 0.0
 
 rows = []
 
-for i in range(1000):
+for i in range(10000):
 
     # ==================================================
-    # PHASE 1 (1-200): Normal Takeoff
+    # PHASE 1 (1-2000): Normal Takeoff
     # ==================================================
-    if i < 200:
+    if i < 2000:
 
         altitude += random.uniform(0.4, 0.8)
 
@@ -51,9 +51,9 @@ for i in range(1000):
         longitude += random.uniform(-0.00002, 0.00002)
 
     # ==================================================
-    # PHASE 2 (201-400): Cruise Flight
+    # PHASE 2 (2001-4000): Cruise Flight
     # ==================================================
-    elif i < 400:
+    elif i < 4000:
 
         altitude += random.uniform(-0.3, 0.3)
 
@@ -68,9 +68,9 @@ for i in range(1000):
         longitude += random.uniform(-0.00003, 0.00003)
 
     # ==================================================
-    # PHASE 3 (401-500): Windy Area
+    # PHASE 3 (4001-5000): Windy Area
     # ==================================================
-    elif i < 500:
+    elif i < 5000:
 
         altitude += random.uniform(-0.5, 0.5)
 
@@ -85,9 +85,9 @@ for i in range(1000):
         longitude += random.uniform(-0.00004, 0.00004)
 
     # ==================================================
-    # PHASE 4 (501-650): GPS Drift Simulation
+    # PHASE 4 (5001-6500): GPS Drift Simulation
     # ==================================================
-    elif i < 650:
+    elif i < 6500:
 
         altitude += random.uniform(-0.4, 0.4)
 
@@ -102,9 +102,9 @@ for i in range(1000):
         longitude += random.uniform(-0.00015, 0.00015)
 
     # ==================================================
-    # PHASE 5 (651-800): Rapid Battery Drain
+    # PHASE 5 (6501-8000): Rapid Battery Drain
     # ==================================================
-    elif i < 800:
+    elif i < 8000:
 
         altitude += random.uniform(-0.5, 0.3)
 
@@ -119,9 +119,9 @@ for i in range(1000):
         longitude += random.uniform(-0.00004, 0.00004)
 
     # ==================================================
-    # PHASE 6 (801-900): Motor Overheating
+    # PHASE 6 (8001-9000): Motor Overheating
     # ==================================================
-    elif i < 900:
+    elif i < 9000:
 
         altitude += random.uniform(-0.6, 0.3)
 
@@ -136,11 +136,11 @@ for i in range(1000):
         longitude += random.uniform(-0.00005, 0.00005)
 
     # ==================================================
-    # PHASE 7 (901-1000): Emergency Landing
+    # PHASE 7 (9001-10000): Emergency Landing
     # ==================================================
     else:
 
-        remaining_steps = 1000 - i
+        remaining_steps = 10000 - i
 
         altitude -= max(
             altitude / max(remaining_steps, 1),
