@@ -1,8 +1,11 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QPushButton)
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 class LoginWindow(QWidget):
+
+    login_success= Signal(str)
+
     def __init__(self, authenticator):
         super().__init__()
         
@@ -195,6 +198,7 @@ class LoginWindow(QWidget):
         if success:
             # Output role. Keep generic.
             print(f"Login OK! Role: {role}")
+            self.login_success.emit(role)
         else:
             # Show generic error.
             self.lbl_error.setText(message)
